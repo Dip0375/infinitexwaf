@@ -38,10 +38,11 @@ sudo apt-get install -y -qq \
 
 print "Installing Node.js $NODE_VERSION"
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v)" != v${NODE_VERSION}* ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash - -qq
+  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -s --
+  sudo apt-get update -qq
   sudo apt-get install -y -qq nodejs
 fi
-print "Node version: $(node -v), npm version: $(npm -v)"
+print "Node version: $(node -v || true), npm version: $(npm -v || true)"
 
 print "Installing PM2"
 sudo npm install -g pm2 --quiet
