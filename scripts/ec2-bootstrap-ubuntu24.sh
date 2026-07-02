@@ -69,7 +69,7 @@ print "Installing backend dependencies and building WAF"
 sudo -u "$APP_USER" bash -lc "cd '$APP_DIR' && npm ci --prefer-offline --quiet && npm run build"
 
 print "Installing dashboard dependencies and building UI"
-sudo -u "$APP_USER" bash -lc "cd '$APP_DIR/dashboard' && npm ci --prefer-offline --quiet && npm run build"
+sudo -u "$APP_USER" bash -lc "cd '$APP_DIR/dashboard' && npm ci --prefer-offline && npm run build"
 
 print "Creating environment configuration"
 ENV_FILE="$ENV_DIR/infinitex.env"

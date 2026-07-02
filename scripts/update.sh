@@ -27,7 +27,7 @@ sudo -u "$APP_USER" bash -c "cd $APP_DIR && npm run build"
 ok "Backend built"
 
 step "Build dashboard"
-sudo -u "$APP_USER" bash -c "cd $APP_DIR/dashboard && npm ci --prefer-offline --quiet && npm run build"
+sudo -u "$APP_USER" bash -c "cd $APP_DIR/dashboard && npm ci --prefer-offline && npm run build"
 ok "Dashboard built"
 
 step "Restart WAF"

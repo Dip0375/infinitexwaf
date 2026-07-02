@@ -14,7 +14,7 @@ err()  { echo -e "${RED}[✗]${NC} $1"; exit 1; }
 step() { echo -e "\n${GREEN}━━━ $1 ━━━${NC}"; }
 
 # ── Config — edit these before running ───────────────────────
-REPO_URL="${REPO_URL:-https://github.com/YOUR_ORG/YOUR_REPO.git}"
+REPO_URL="${REPO_URL:-https://github.com/Dip0375/infinitexwaf.git}"
 BRANCH="${BRANCH:-main}"
 APP_DIR="/opt/infinitex"
 APP_USER="infinitex"
@@ -43,7 +43,8 @@ ok "System packages installed"
 # ── 2. Node.js 20 via NodeSource ─────────────────────────────
 step "Node.js $NODE_VERSION"
 if ! command -v node &>/dev/null || [[ "$(node -v)" != v${NODE_VERSION}* ]]; then
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash - -qq
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -s --
+    sudo apt-get update -qq
     sudo apt-get install -y -qq nodejs
 fi
 ok "Node $(node -v) / npm $(npm -v)"
@@ -87,7 +88,7 @@ ok "WAF backend built"
 step "Build dashboard UI"
 sudo -u "$APP_USER" bash -c "
     cd $APP_DIR/dashboard
-    npm ci --prefer-offline --quiet
+    npm ci --prefer-offline
     npm run build
 "
 ok "Dashboard built → $APP_DIR/dashboard/dist"
