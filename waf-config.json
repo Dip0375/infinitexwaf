@@ -1,0 +1,23 @@
+{
+  "mode": "BLOCK",
+  "rules": [
+    "SQLI-001",
+    "XSS-001",
+    "PT-001",
+    "CMDI-001",
+    "NOSQLI-001",
+    "SSRF-001",
+    "BOT-001",
+    "METH-001",
+    "NULL-001"
+  ],
+  "rateLimit": {
+    "enabled": true,
+    "windowMs": 60000,
+    "maxRequests": 100,
+    "blockDurationMs": 300000
+  },
+  "ipBlacklist": [],
+  "ipWhitelist": [],
+  "geoBlacklist": []
+}

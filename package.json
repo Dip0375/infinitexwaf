@@ -1,0 +1,52 @@
+{
+  "name": "universal-waf",
+  "version": "2.0.0",
+  "description": "Universal Web Application Firewall with Advanced Protection - GeoIP, DDoS, Bot Protection, Brute Force Prevention",
+  "main": "dist/index-advanced.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "dev:server": "ts-node-dev --respawn --transpile-only src/standalone/dev-server.ts",
+    "start": "node dist/standalone/infinitex-server.js",
+    "proxy:start": "node dist/standalone/server.js",
+    "proxy:start:advanced": "node dist/standalone/advanced-server.js",
+    "package:lambda": "npm run build && cd dist && zip -r ../lambda-edge.zip lambda-edge/* && zip -r ../lambda-alb.zip lambda-alb/* && zip -r ../lambda-edge-advanced.zip lambda-edge/advanced.* && zip -r ../lambda-alb-advanced.zip lambda-alb/advanced.*",
+    "docker:build": "docker build -t universal-waf:latest .",
+    "docker:run": "docker run -p 3000:3000 -e BACKEND_URL=http://host.docker.internal:8080 universal-waf:latest",
+    "deploy:aws": "./deploy.sh",
+    "clean": "rm -rf dist lambda-*.zip"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "http-proxy-middleware": "^2.0.6"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.131",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.11",
+    "ts-jest": "^29.1.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "waf",
+    "web-application-firewall",
+    "security",
+    "ddos-protection",
+    "bot-protection",
+    "cloudfront",
+    "lambda",
+    "aws",
+    "owasp"
+  ],
+  "author": "Code for Humanity",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/universal-waf"
+  }
+}

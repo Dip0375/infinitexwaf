@@ -1,0 +1,36 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+dashboard/node_modules/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+dashboard/dist/
+*.js.map
+
+# ── Lambda packages ───────────────────────────────────────────────────────────
+lambda-*.zip
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+infinitex-config.json
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Editor ────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+
+# ── Terraform state ───────────────────────────────────────────────────────────
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl

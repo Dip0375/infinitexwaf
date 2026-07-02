@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: universal-waf
+  labels:
+    app: universal-waf
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: universal-waf
+  template:
+    metadata:
+      labels:
+        app: universal-waf
+    spec:
+      containers:
+      - name: waf
+        image: universal-waf:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: WAF_PORT
+          value: "3000"
+        - name: BACKEND_URL
+          value: "http://backend-service:8080"
+        - name: NODE_ENV
+          value: "production"
+        livenessProbe:
+          httpGet:
+            path: /waf/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /waf/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: universal-waf
+  labels:
+    app: universal-waf
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: universal-waf
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: universal-waf
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  rules:
+  - host: app.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: universal-waf
+            port:
+              number: 80
