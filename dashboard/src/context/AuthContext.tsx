@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username: username.toLowerCase(),
       role: found.role,
       loginAt: new Date().toISOString(),
-      sessionId: crypto.randomUUID(),
+      sessionId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36),
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
     setUser(newUser);
