@@ -122,7 +122,7 @@ const ruleDefinitions: Record<string, { name: string; category: string; severity
 export function logRequestForDashboard(request: any, result: AdvancedWAFResult): void {
   const timestamp = new Date();
 
-  // Add to request logs
+  // Add to request logs — enriched with detail
   requestLogs.push({
     timestamp: timestamp.toISOString(),
     clientIp: request.clientIp,
@@ -133,8 +133,14 @@ export function logRequestForDashboard(request: any, result: AdvancedWAFResult):
     allowed: result.allowed,
     ruleId: result.ruleId,
     reasons: result.reasons,
-    geoCountry: result.geoCountry,
-    threatScore: result.threatScore,
+    geoCountry: result.geoCountry || null,
+    threatScore: result.threatScore || 0,
+    statusCode: result.statusCode || (result.allowed ? 200 : 403),
+    responseTime: Date.now() - (request.timestamp || Date.now()),
+    host: request.headers?.host || request.host || null,
+    protocol: request.headers?.['x-forwarded-proto'] || request.protocol || 'http',
+    contentType: request.headers?.['content-type'] || null,
+    referer: request.headers?.referer || null,
   });
 
   // Limit log size

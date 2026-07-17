@@ -16,6 +16,13 @@ interface LogEntry {
   ruleId: string | null;
   geoCountry: string | null;
   threatScore: number;
+  statusCode?: number;
+  responseTime?: number;
+  host?: string | null;
+  protocol?: string;
+  contentType?: string | null;
+  referer?: string | null;
+  reasons?: string[];
 }
 
 const ACTION_STYLE: Record<string, string> = {
@@ -34,6 +41,15 @@ const METHOD_COLOR: Record<string, string> = {
   PATCH:  'text-purple-400',
 };
 
+const COUNTRY_FLAGS: Record<string, string> = {
+  US: '🇺🇸', IN: '🇮🇳', GB: '🇬🇧', DE: '🇩🇪', FR: '🇫🇷', JP: '🇯🇵', BR: '🇧🇷', RU: '🇷🇺',
+  AU: '🇦🇺', CA: '🇨🇦', KR: '🇰🇷', SG: '🇸🇬', NL: '🇳🇱', IE: '🇮🇪', SE: '🇸🇪', NO: '🇳🇴',
+  FI: '🇫🇮', DK: '🇩🇰', PL: '🇵🇱', IT: '🇮🇹', ES: '🇪🇸', PT: '🇵🇹', CH: '🇨🇭', AT: '🇦🇹',
+  BE: '🇧🇪', NZ: '🇳🇿', MX: '🇲🇽', ZA: '🇿🇦', CN: '🇨🇳', TW: '🇹🇼', TH: '🇹🇭', VN: '🇻🇳',
+  PH: '🇵🇭', ID: '🇮🇩', MY: '🇲🇾', BD: '🇧🇩', PK: '🇵🇰', AE: '🇦🇪', SA: '🇸🇦', EG: '🇪🇬',
+  NG: '🇳🇬', KE: '🇰🇪', LOCAL: '🏠',
+};
+
 function ThreatBar({ score }: { score: number }) {
   const color = score >= 70 ? 'bg-red-500' : score >= 40 ? 'bg-yellow-500' : 'bg-green-500';
   return (
@@ -49,18 +65,20 @@ function ThreatBar({ score }: { score: number }) {
 function LogRow({ entry }: { entry: LogEntry }) {
   const [open, setOpen] = useState(false);
   const style = ACTION_STYLE[entry.action] ?? 'text-gray-400 bg-gray-800 border-gray-700';
+  const flag = entry.geoCountry ? (COUNTRY_FLAGS[entry.geoCountry] || '🌍') : '';
 
   return (
     <div className="border-b border-gray-800/60 hover:bg-gray-800/20 transition-colors">
       <div
-        className="grid grid-cols-[160px_110px_60px_1fr_90px_80px_32px] gap-2 px-4 py-2.5 items-center cursor-pointer text-sm"
+        className="grid grid-cols-[160px_110px_55px_40px_1fr_90px_80px_32px] gap-2 px-4 py-2.5 items-center cursor-pointer text-sm"
         onClick={() => setOpen((o) => !o)}
       >
         <span className="text-gray-400 font-mono text-xs">
           {new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </span>
-        <span className="text-gray-300 font-mono text-xs truncate">{entry.clientIp}</span>
+        <span className="text-gray-300 font-mono text-xs truncate" title={entry.clientIp}>{entry.clientIp}</span>
         <span className={`text-xs font-bold ${METHOD_COLOR[entry.method] ?? 'text-gray-400'}`}>{entry.method}</span>
+        <span className="text-center" title={entry.geoCountry || 'Unknown'}>{flag || <span className="text-gray-600">—</span>}</span>
         <span className="text-white text-xs truncate font-mono" title={entry.uri}>{entry.uri}</span>
         <span className={`text-xs px-2 py-0.5 rounded border w-fit ${style}`}>{entry.action}</span>
         <ThreatBar score={entry.threatScore} />
@@ -68,13 +86,22 @@ function LogRow({ entry }: { entry: LogEntry }) {
       </div>
 
       {open && (
-        <div className="px-4 pb-4 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+        <div className="px-4 pb-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           {[
-            { label: 'Full URI',      value: entry.uri,                    mono: true  },
-            { label: 'User Agent',    value: entry.userAgent || '—',       mono: false },
-            { label: 'Country',       value: entry.geoCountry || 'Unknown',mono: false },
-            { label: 'Rule Triggered',value: entry.ruleId || 'None',       mono: true  },
-            { label: 'Threat Score',  value: String(entry.threatScore),    mono: false },
+            { label: 'Full URI',      value: entry.uri,                              mono: true  },
+            { label: 'User Agent',    value: entry.userAgent || '—',                 mono: false },
+            { label: 'Country',       value: `${flag ? flag + ' ' : ''}${entry.geoCountry || 'Unknown'}`, mono: false },
+            { label: 'Source IP',     value: entry.clientIp,                         mono: true  },
+            { label: 'Status Code',   value: String(entry.statusCode ?? (entry.allowed ? 200 : 403)), mono: false },
+            { label: 'Response Time', value: entry.responseTime != null ? `${entry.responseTime}ms` : '—', mono: false },
+            { label: 'Protocol',      value: entry.protocol || 'http',              mono: false },
+            { label: 'Host',          value: entry.host || '—',                     mono: true  },
+            { label: 'Rule Triggered',value: entry.ruleId || 'None',                mono: true  },
+            { label: 'Reasons',       value: entry.reasons?.join(', ') || '—',      mono: false },
+            { label: 'Threat Score',  value: String(entry.threatScore),             mono: false },
+            { label: 'Content Type',  value: entry.contentType || '—',              mono: false },
+            { label: 'Referer',       value: entry.referer || '—',                  mono: false },
+            { label: 'Action',        value: entry.action,                          mono: false },
             { label: 'Timestamp',     value: new Date(entry.timestamp).toLocaleString(), mono: false },
           ].map((f) => (
             <div key={f.label} className="bg-gray-800/50 rounded-lg p-2.5">
@@ -127,10 +154,11 @@ export function TrafficLogsPage() {
   const filtered = logs.filter((l) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return l.clientIp.includes(q) || l.uri.toLowerCase().includes(q) ||
-           (l.userAgent ?? '').toLowerCase().includes(q) ||
-           (l.ruleId ?? '').toLowerCase().includes(q) ||
-           (l.geoCountry ?? '').toLowerCase().includes(q);
+  return l.clientIp.includes(q) || l.uri.toLowerCase().includes(q) ||
+         (l.userAgent ?? '').toLowerCase().includes(q) ||
+         (l.ruleId ?? '').toLowerCase().includes(q) ||
+         (l.geoCountry ?? '').toLowerCase().includes(q) ||
+         (l.reasons ?? []).some((r) => r.toLowerCase().includes(q));
   });
 
   const stats = {
@@ -245,10 +273,11 @@ export function TrafficLogsPage() {
       {/* Log table */}
       <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
         {/* Column headers */}
-        <div className="grid grid-cols-[160px_110px_60px_1fr_90px_80px_32px] gap-2 px-4 py-3 border-b border-gray-800 text-xs text-gray-500 uppercase tracking-wider">
+        <div className="grid grid-cols-[160px_110px_55px_40px_1fr_90px_80px_32px] gap-2 px-4 py-3 border-b border-gray-800 text-xs text-gray-500 uppercase tracking-wider">
           <span>Time</span>
           <span>Source IP</span>
           <span>Method</span>
+          <span className="text-center">🌍</span>
           <span>URI</span>
           <span>Action</span>
           <span>Threat</span>

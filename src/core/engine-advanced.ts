@@ -15,6 +15,7 @@ import {
   BOT_BEHAVIORAL_THRESHOLDS,
 } from './rules-advanced';
 import { threatIntelService } from '../threat-intel/service';
+import * as geoip from 'geoip-lite';
 
 // Result with action details
 export interface AdvancedWAFResult extends WAFResult {
@@ -381,8 +382,16 @@ export class AdvancedWAFEngine {
 
   private getGeoCountry(ip: string): string | undefined {
     if (geoIpCache.has(ip)) return geoIpCache.get(ip);
-    // Would integrate with MaxMind GeoIP2 or similar
-    // For now, return undefined
+    // Skip private/local IPs
+    if (ip === 'unknown' || ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('192.168.')) {
+      geoIpCache.set(ip, 'LOCAL');
+      return 'LOCAL';
+    }
+    const geo = geoip.lookup(ip);
+    if (geo && geo.country) {
+      geoIpCache.set(ip, geo.country);
+      return geo.country;
+    }
     return undefined;
   }
 
