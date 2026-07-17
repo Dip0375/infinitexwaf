@@ -2,7 +2,7 @@
 # ============================================================
 #  InfiniteX WAF — EC2 Ubuntu Bootstrap Script
 #  Run as: bash scripts/ec2-bootstrap.sh
-#  Or remotely: bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/scripts/ec2-bootstrap.sh)
+#  Or remotely: bash <(curl -fsSL https://raw.githubusercontent.com/Dip0375/infinitexwaf/main/scripts/ec2-bootstrap.sh)
 # ============================================================
 set -euo pipefail
 

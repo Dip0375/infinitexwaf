@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Plus, Trash2, Edit2, ToggleLeft, ToggleRight,
   ChevronDown, ChevronUp, Search, Filter, Copy, AlertTriangle,
-  CheckCircle, Lock, Zap, RefreshCw, X, Info,
+  CheckCircle, Lock, Zap, RefreshCw, X, Info, Globe, Route,
+  Server, Bot, Gauge, Eye, ShieldOff, Terminal, Network,
+  Database, FileText, Settings, List,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAudit } from '../hooks/useAudit';
@@ -53,6 +55,147 @@ const EMPTY_FORM = {
   conditionLogic: 'AND' as ConditionLogic, conditions: [{ ...EMPTY_CONDITION }], tags: [] as string[],
 };
 
+// ── Managed Rule Config (AWS WAF-style rule group parameters) ─────────────────
+type ManagedAction = 'ALLOW' | 'BLOCK' | 'LOG' | 'LOGGED' | 'CHALLENGE';
+type SqliLevel = 'BASIC' | 'MODERATE' | 'STRICT';
+type XssLevel = 'BASIC' | 'MODERATE' | 'STRICT';
+type BotLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'AGGRESSIVE';
+
+interface ManagedRuleConfig {
+  action?: ManagedAction;
+  geoCountries?: string[];
+  adminEndpoints?: string[];
+  botLevel?: BotLevel;
+  botBlockHeadless?: boolean;
+  rateLimitRequests?: number;
+  rateLimitWindow?: number;
+  rateLimitBurst?: number;
+  sqliLevel?: SqliLevel;
+  xssLevel?: XssLevel;
+  blockTor?: boolean;
+  blockVpn?: boolean;
+  blockProxy?: boolean;
+  blockHosting?: boolean;
+  ipReputationEnabled?: boolean;
+}
+
+// ── Sub-Rule Types (individual rules within managed rule groups) ──────────────
+interface SubRuleDef {
+  id: string; name: string; description: string; label: string;
+  defaultAction: ManagedAction; scope?: string;
+}
+interface SubRuleState { enabled: boolean; action?: ManagedAction; deleted?: boolean; }
+
+const COUNTRY_LIST: { code: string; name: string }[] = [
+  { code: 'AF', name: 'Afghanistan' }, { code: 'AL', name: 'Albania' },
+  { code: 'DZ', name: 'Algeria' }, { code: 'AD', name: 'Andorra' },
+  { code: 'AO', name: 'Angola' }, { code: 'AR', name: 'Argentina' },
+  { code: 'AM', name: 'Armenia' }, { code: 'AU', name: 'Australia' },
+  { code: 'AT', name: 'Austria' }, { code: 'AZ', name: 'Azerbaijan' },
+  { code: 'BS', name: 'Bahamas' }, { code: 'BH', name: 'Bahrain' },
+  { code: 'BD', name: 'Bangladesh' }, { code: 'BB', name: 'Barbados' },
+  { code: 'BY', name: 'Belarus' }, { code: 'BE', name: 'Belgium' },
+  { code: 'BZ', name: 'Belize' }, { code: 'BJ', name: 'Benin' },
+  { code: 'BT', name: 'Bhutan' }, { code: 'BO', name: 'Bolivia' },
+  { code: 'BA', name: 'Bosnia and Herzegovina' }, { code: 'BW', name: 'Botswana' },
+  { code: 'BR', name: 'Brazil' }, { code: 'BN', name: 'Brunei' },
+  { code: 'BG', name: 'Bulgaria' }, { code: 'BF', name: 'Burkina Faso' },
+  { code: 'BI', name: 'Burundi' }, { code: 'KH', name: 'Cambodia' },
+  { code: 'CM', name: 'Cameroon' }, { code: 'CA', name: 'Canada' },
+  { code: 'CV', name: 'Cape Verde' }, { code: 'CF', name: 'Central African Republic' },
+  { code: 'TD', name: 'Chad' }, { code: 'CL', name: 'Chile' },
+  { code: 'CN', name: 'China' }, { code: 'CO', name: 'Colombia' },
+  { code: 'KM', name: 'Comoros' }, { code: 'CG', name: 'Congo' },
+  { code: 'CR', name: 'Costa Rica' }, { code: 'HR', name: 'Croatia' },
+  { code: 'CU', name: 'Cuba' }, { code: 'CY', name: 'Cyprus' },
+  { code: 'CZ', name: 'Czech Republic' }, { code: 'DK', name: 'Denmark' },
+  { code: 'DJ', name: 'Djibouti' }, { code: 'DO', name: 'Dominican Republic' },
+  { code: 'EC', name: 'Ecuador' }, { code: 'EG', name: 'Egypt' },
+  { code: 'SV', name: 'El Salvador' }, { code: 'EE', name: 'Estonia' },
+  { code: 'ET', name: 'Ethiopia' }, { code: 'FI', name: 'Finland' },
+  { code: 'FR', name: 'France' }, { code: 'GA', name: 'Gabon' },
+  { code: 'GM', name: 'Gambia' }, { code: 'GE', name: 'Georgia' },
+  { code: 'DE', name: 'Germany' }, { code: 'GH', name: 'Ghana' },
+  { code: 'GR', name: 'Greece' }, { code: 'GT', name: 'Guatemala' },
+  { code: 'GN', name: 'Guinea' }, { code: 'GY', name: 'Guyana' },
+  { code: 'HT', name: 'Haiti' }, { code: 'HN', name: 'Honduras' },
+  { code: 'HK', name: 'Hong Kong' }, { code: 'HU', name: 'Hungary' },
+  { code: 'IS', name: 'Iceland' }, { code: 'IN', name: 'India' },
+  { code: 'ID', name: 'Indonesia' }, { code: 'IR', name: 'Iran' },
+  { code: 'IQ', name: 'Iraq' }, { code: 'IE', name: 'Ireland' },
+  { code: 'IL', name: 'Israel' }, { code: 'IT', name: 'Italy' },
+  { code: 'JM', name: 'Jamaica' }, { code: 'JP', name: 'Japan' },
+  { code: 'JO', name: 'Jordan' }, { code: 'KZ', name: 'Kazakhstan' },
+  { code: 'KE', name: 'Kenya' }, { code: 'KP', name: 'North Korea' },
+  { code: 'KR', name: 'South Korea' }, { code: 'KW', name: 'Kuwait' },
+  { code: 'KG', name: 'Kyrgyzstan' }, { code: 'LA', name: 'Laos' },
+  { code: 'LV', name: 'Latvia' }, { code: 'LB', name: 'Lebanon' },
+  { code: 'LY', name: 'Libya' }, { code: 'LI', name: 'Liechtenstein' },
+  { code: 'LT', name: 'Lithuania' }, { code: 'LU', name: 'Luxembourg' },
+  { code: 'MO', name: 'Macau' }, { code: 'MK', name: 'North Macedonia' },
+  { code: 'MG', name: 'Madagascar' }, { code: 'MW', name: 'Malawi' },
+  { code: 'MY', name: 'Malaysia' }, { code: 'MV', name: 'Maldives' },
+  { code: 'ML', name: 'Mali' }, { code: 'MT', name: 'Malta' },
+  { code: 'MX', name: 'Mexico' }, { code: 'MD', name: 'Moldova' },
+  { code: 'MC', name: 'Monaco' }, { code: 'MN', name: 'Mongolia' },
+  { code: 'ME', name: 'Montenegro' }, { code: 'MA', name: 'Morocco' },
+  { code: 'MZ', name: 'Mozambique' }, { code: 'MM', name: 'Myanmar' },
+  { code: 'NA', name: 'Namibia' }, { code: 'NP', name: 'Nepal' },
+  { code: 'NL', name: 'Netherlands' }, { code: 'NZ', name: 'New Zealand' },
+  { code: 'NI', name: 'Nicaragua' }, { code: 'NE', name: 'Niger' },
+  { code: 'NG', name: 'Nigeria' }, { code: 'NO', name: 'Norway' },
+  { code: 'OM', name: 'Oman' }, { code: 'PK', name: 'Pakistan' },
+  { code: 'PA', name: 'Panama' }, { code: 'PY', name: 'Paraguay' },
+  { code: 'PE', name: 'Peru' }, { code: 'PH', name: 'Philippines' },
+  { code: 'PL', name: 'Poland' }, { code: 'PT', name: 'Portugal' },
+  { code: 'QA', name: 'Qatar' }, { code: 'RO', name: 'Romania' },
+  { code: 'RU', name: 'Russia' }, { code: 'RW', name: 'Rwanda' },
+  { code: 'SA', name: 'Saudi Arabia' }, { code: 'SN', name: 'Senegal' },
+  { code: 'RS', name: 'Serbia' }, { code: 'SG', name: 'Singapore' },
+  { code: 'SK', name: 'Slovakia' }, { code: 'SI', name: 'Slovenia' },
+  { code: 'SO', name: 'Somalia' }, { code: 'ZA', name: 'South Africa' },
+  { code: 'ES', name: 'Spain' }, { code: 'LK', name: 'Sri Lanka' },
+  { code: 'SD', name: 'Sudan' }, { code: 'SE', name: 'Sweden' },
+  { code: 'CH', name: 'Switzerland' }, { code: 'SY', name: 'Syria' },
+  { code: 'TW', name: 'Taiwan' }, { code: 'TJ', name: 'Tajikistan' },
+  { code: 'TZ', name: 'Tanzania' }, { code: 'TH', name: 'Thailand' },
+  { code: 'TL', name: 'Timor-Leste' }, { code: 'TN', name: 'Tunisia' },
+  { code: 'TR', name: 'Turkey' }, { code: 'TM', name: 'Turkmenistan' },
+  { code: 'UG', name: 'Uganda' }, { code: 'UA', name: 'Ukraine' },
+  { code: 'AE', name: 'United Arab Emirates' }, { code: 'GB', name: 'United Kingdom' },
+  { code: 'US', name: 'United States' }, { code: 'UY', name: 'Uruguay' },
+  { code: 'UZ', name: 'Uzbekistan' }, { code: 'VE', name: 'Venezuela' },
+  { code: 'VN', name: 'Vietnam' }, { code: 'YE', name: 'Yemen' },
+  { code: 'ZM', name: 'Zambia' }, { code: 'ZW', name: 'Zimbabwe' },
+];
+
+const MANAGED_ACTION_OPTIONS: ManagedAction[] = ['ALLOW', 'BLOCK', 'LOG', 'LOGGED', 'CHALLENGE']; 
+const SQLI_LEVEL_OPTIONS: SqliLevel[] = ['BASIC', 'MODERATE', 'STRICT'];
+const XSS_LEVEL_OPTIONS: XssLevel[] = ['BASIC', 'MODERATE', 'STRICT'];
+const BOT_LEVEL_OPTIONS: BotLevel[] = ['LOW', 'MEDIUM', 'HIGH', 'AGGRESSIVE'];
+
+// Map each managed rule ID to its icon
+const RULE_ICONS: Record<string, React.ComponentType<any>> = {
+  'CORE-001': Shield, 'SQLI-001': Terminal,
+  'BOT-001': Bot, 'RATE-001': Gauge, 'NULL-001': ShieldOff,
+  'METH-001': Lock, 'CT-001': FileText, 'GEO-001': Globe,
+  'ANON-001': Eye, 'THREAT-INTEL-001': Network, 'NOSQLI-001': Database,
+};
+
+const DEFAULT_MANAGED_CONFIGS: Record<string, ManagedRuleConfig> = {
+  'GEO-001': { action: 'BLOCK', geoCountries: [] },
+  'METH-001': { action: 'BLOCK', adminEndpoints: ['/login', '/auth', '/admin', '/wp-login.php', '/api/auth'] },
+  'SQLI-001': { action: 'BLOCK', sqliLevel: 'MODERATE' },
+  'BOT-001':  { action: 'BLOCK', botLevel: 'MEDIUM', botBlockHeadless: false },
+  'RATE-001': { action: 'BLOCK', rateLimitRequests: 100, rateLimitWindow: 60, rateLimitBurst: 150 },
+  'ANON-001': { action: 'CHALLENGE', blockTor: false, blockVpn: false, blockProxy: false, blockHosting: false },
+  'CORE-001': { action: 'BLOCK' },
+  'NOSQLI-001': { action: 'BLOCK' },
+  'NULL-001': { action: 'BLOCK' },
+  'CT-001':   { action: 'BLOCK' },
+  'THREAT-INTEL-001': { action: 'BLOCK' },
+};
+
 // ── Small shared components ───────────────────────────────────────────────────
 function SevBadge({ s }: { s: Severity }) {
   return <span className={`text-xs px-2 py-0.5 rounded border font-medium ${SEV_STYLE[s]}`}>{s}</span>;
@@ -83,17 +226,384 @@ function SelectField({ label, value, onChange, options }: {
   );
 }
 
-// ── Built-in rule row ─────────────────────────────────────────────────────────
-function BuiltInRow({ rule, onToggle }: { rule: BuiltInRule; onToggle: (id: string, v: boolean) => void }) {
+// ── Managed Rule Config Sub-components ────────────────────────────────────────
+
+function ActionSelect({ value, onChange }: { value: ManagedAction; onChange: (v: ManagedAction) => void }) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 block mb-1.5">Override Action</label>
+      <select value={value} onChange={(e) => onChange(e.target.value as ManagedAction)}
+        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+        {MANAGED_ACTION_OPTIONS.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+      <p className="text-xs text-gray-600 mt-1">Default action for this rule group</p>
+    </div>
+  );
+}
+
+function CountryMultiSelect({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
+  const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const filtered = COUNTRY_LIST.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase())
+  );
+  const toggle = (code: string) => {
+    onChange(selected.includes(code) ? selected.filter((s) => s !== code) : [...selected, code]);
+  };
+  return (
+    <div className="relative">
+      <label className="text-xs text-gray-500 block mb-1.5">Restricted Countries</label>
+      <button onClick={() => setOpen(!open)}
+        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-left text-white focus:outline-none focus:border-cyan-500">
+        {selected.length === 0
+          ? <span className="text-gray-500">Select countries to restrict…</span>
+          : <span>{selected.length} country{selected.length !== 1 ? 'ies' : 'y'} selected</span>}
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-gray-800 border border-gray-700 rounded-xl shadow-xl max-h-72 flex flex-col">
+          <div className="p-2 border-b border-gray-700">
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search countries…"
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none" />
+          </div>
+          <div className="overflow-y-auto flex-1 p-1">
+            {filtered.length === 0 && (
+              <p className="text-gray-500 text-xs text-center py-3">No countries match</p>
+            )}
+            {filtered.map((c) => (
+              <label key={c.code}
+                className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-700/50 rounded-lg cursor-pointer text-sm">
+                <input type="checkbox" checked={selected.includes(c.code)}
+                  onChange={() => toggle(c.code)} className="w-4 h-4 accent-cyan-500 rounded" />
+                <span className="text-gray-300 flex-1">{c.name}</span>
+                <span className="text-gray-500 font-mono text-xs">{c.code}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {selected.map((code) => {
+            const country = COUNTRY_LIST.find((c) => c.code === code);
+            return (
+              <span key={code}
+                className="flex items-center gap-1 text-xs bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full">
+                {country ? country.name : code}
+                <button onClick={() => toggle(code)} className="hover:text-white">×</button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {open && <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+function PathListEditor({ paths, onChange }: { paths: string[]; onChange: (v: string[]) => void }) {
+  const [input, setInput] = useState('');
+  const add = () => {
+    const p = input.trim();
+    if (p && !paths.includes(p)) { onChange([...paths, p]); setInput(''); }
+  };
+  return (
+    <div>
+      <label className="text-xs text-gray-500 block mb-1.5">Protected Endpoint Paths</label>
+      <div className="flex gap-2 mb-2">
+        <input value={input} onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+          placeholder="/admin"
+          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white font-mono placeholder-gray-500 focus:outline-none focus:border-cyan-500" />
+        <button onClick={add} className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors">Add</button>
+      </div>
+      <div className="space-y-1">
+        {paths.length === 0 && <p className="text-gray-600 text-xs">No endpoints configured</p>}
+        {paths.map((p) => (
+          <div key={p} className="flex items-center justify-between bg-gray-800/50 rounded-lg px-3 py-1.5 text-sm">
+            <span className="text-cyan-400 font-mono">{p}</span>
+            <button onClick={() => onChange(paths.filter((x) => x !== p))}
+              className="text-gray-600 hover:text-red-400 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NumberInput({ label, value, onChange, min, max, hint }: {
+  label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; hint?: string;
+}) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 block mb-1">{label}</label>
+      <input type="number" value={value} onChange={(e) => onChange(Math.max(min ?? 0, +e.target.value))}
+        min={min} max={max}
+        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" />
+      {hint && <p className="text-xs text-gray-600 mt-0.5">{hint}</p>}
+    </div>
+  );
+}
+
+function ToggleSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer py-1.5">
+      <div className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-cyan-500' : 'bg-gray-700'}`}>
+        <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : ''}`} />
+      </div>
+      <span className="text-sm text-gray-300">{label}</span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="hidden" />
+    </label>
+  );
+}
+
+// ── Managed Config Panel ──────────────────────────────────────────────────────
+function ManagedConfigPanel({ ruleId, config, onChange }: {
+  ruleId: string; config: ManagedRuleConfig; onChange: (id: string, patch: Partial<ManagedRuleConfig>) => void;
+}) {
+  const desc = (id: string) => config.action ?? 'BLOCK';
+  const set = (patch: Partial<ManagedRuleConfig>) => onChange(ruleId, patch);
+
+  switch (ruleId) {
+    case 'GEO-001':
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+          </div>
+          <CountryMultiSelect selected={config.geoCountries ?? []} onChange={(v) => set({ geoCountries: v })} />
+        </div>
+      );
+
+    case 'METH-001':
+      return (
+        <div className="space-y-4">
+          <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+          <PathListEditor paths={config.adminEndpoints ?? []} onChange={(v) => set({ adminEndpoints: v })} />
+        </div>
+      );
+
+    case 'SQLI-001':
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1.5">Inspection Level</label>
+              <select value={config.sqliLevel ?? 'MODERATE'} onChange={(e) => set({ sqliLevel: e.target.value as SqliLevel })}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                {SQLI_LEVEL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <p className="text-xs text-gray-600 mt-1">Higher levels detect more but may increase false positives</p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'XSS-001':
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1.5">Inspection Level</label>
+              <select value={config.xssLevel ?? 'MODERATE'} onChange={(e) => set({ xssLevel: e.target.value as XssLevel })}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                {XSS_LEVEL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <p className="text-xs text-gray-600 mt-1">Higher levels detect more XSS vectors</p>
+            </div>
+          </div>
+        </div>
+      );
+
+    case 'BOT-001':
+      return (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+            <div>
+              <label className="text-xs text-gray-500 block mb-1.5">Protection Level</label>
+              <select value={config.botLevel ?? 'MEDIUM'} onChange={(e) => set({ botLevel: e.target.value as BotLevel })}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                {BOT_LEVEL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+          <ToggleSwitch label="Block headless browsers" checked={config.botBlockHeadless ?? false}
+            onChange={(v) => set({ botBlockHeadless: v })} />
+        </div>
+      );
+
+    case 'RATE-001':
+      return (
+        <div className="space-y-4">
+          <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <NumberInput label="Max Requests" value={config.rateLimitRequests ?? 100}
+              onChange={(v) => set({ rateLimitRequests: v })} min={1} hint="Requests per window" />
+            <NumberInput label="Window (seconds)" value={config.rateLimitWindow ?? 60}
+              onChange={(v) => set({ rateLimitWindow: v })} min={1} hint="Time window" />
+            <NumberInput label="Burst Limit" value={config.rateLimitBurst ?? 150}
+              onChange={(v) => set({ rateLimitBurst: v })} min={1} hint="Burst tolerance" />
+          </div>
+        </div>
+      );
+
+    case 'ANON-001':
+      return (
+        <div className="space-y-4">
+          <ActionSelect value={config.action ?? 'CHALLENGE'} onChange={(v) => set({ action: v })} />
+          <div className="space-y-1">
+            <p className="text-xs text-gray-500 mb-1">Block anonymous traffic types</p>
+            <ToggleSwitch label="Block TOR exit nodes" checked={config.blockTor ?? false}
+              onChange={(v) => set({ blockTor: v })} />
+            <ToggleSwitch label="Block VPN providers" checked={config.blockVpn ?? false}
+              onChange={(v) => set({ blockVpn: v })} />
+            <ToggleSwitch label="Block public proxies" checked={config.blockProxy ?? false}
+              onChange={(v) => set({ blockProxy: v })} />
+            <ToggleSwitch label="Block hosting providers" checked={config.blockHosting ?? false}
+              onChange={(v) => set({ blockHosting: v })} />
+          </div>
+        </div>
+      );
+
+    case 'THREAT-INTEL-001':
+      return (
+        <div className="space-y-4">
+          <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+        </div>
+      );
+
+    default:
+      return (
+        <div className="space-y-4">
+          <ActionSelect value={config.action ?? 'BLOCK'} onChange={(v) => set({ action: v })} />
+        </div>
+      );
+  }
+}
+
+// ── Sub-Rule Row ──────────────────────────────────────────────────────────────
+function SubRuleRow({ rule, state, onStateChange, onDelete }: {
+  rule: SubRuleDef; state?: SubRuleState;
+  onStateChange: (id: string, patch: Partial<SubRuleState>) => void;
+  onDelete: (id: string) => void;
+}) {
+  const s = state ?? { enabled: true };
+  const currentAction = s.action ?? rule.defaultAction;
+  return (
+    <div className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${
+      s.enabled ? 'border-gray-700/50 bg-gray-800/30' : 'border-gray-800 bg-gray-800/10 opacity-50'
+    }`}>
+      <Toggle on={s.enabled} onChange={(v) => onStateChange(rule.id, { enabled: v })} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-white">{rule.name}</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+            currentAction === 'BLOCK' ? 'text-red-400 bg-red-500/10' :
+            currentAction === 'ALLOW' ? 'text-green-400 bg-green-500/10' :
+            currentAction === 'CHALLENGE' ? 'text-purple-400 bg-purple-500/10' :
+            'text-blue-400 bg-blue-500/10'
+          }`}>{currentAction}</span>
+          {s.action && s.action !== rule.defaultAction && (
+            <span className="text-xs text-yellow-400">(overridden)</span>
+          )}
+          {rule.scope && (
+            <span className="text-xs bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded font-mono">{rule.scope}</span>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5">{rule.description}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <select value={currentAction} onChange={(e) => {
+          const val = e.target.value as ManagedAction;
+          onStateChange(rule.id, { action: val === rule.defaultAction ? undefined : val });
+        }}
+          className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500">
+          {MANAGED_ACTION_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <button onClick={() => onDelete(rule.id)}
+          className="p-1 hover:bg-red-500/10 rounded text-gray-500 hover:text-red-400 transition-colors" title="Remove rule">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Sub-Rule List ─────────────────────────────────────────────────────────────
+function SubRuleList({ groupId, subRules, subRuleStates, onSubRuleChange, onSubRuleDelete }: {
+  groupId: string; subRules: SubRuleDef[]; subRuleStates: Record<string, SubRuleState>;
+  onSubRuleChange: (id: string, patch: Partial<SubRuleState>) => void;
+  onSubRuleDelete: (id: string) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const activeCount = subRules.filter((r) => subRuleStates[r.id]?.enabled ?? true).length;
+  return (
+    <div className="bg-gray-800/20 border border-gray-700/30 rounded-xl overflow-hidden">
+      <button onClick={() => setCollapsed(!collapsed)}
+        className="flex items-center justify-between w-full px-4 py-2.5 bg-gray-800/40 hover:bg-gray-800/60 transition-colors">
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <List className="w-3.5 h-3.5" />
+          <span className="font-medium">{subRules.length} individual rules</span>
+          <span className="text-green-400">({activeCount} active)</span>
+        </div>
+        {collapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+      </button>
+      {!collapsed && (
+        <div className="p-3 space-y-1.5">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <p className="text-xs text-gray-500">Toggle or override action per rule — delete unwanted rules</p>
+          </div>
+          {subRules.map((sr) => (
+            <SubRuleRow key={sr.id} rule={sr}
+              state={subRuleStates[sr.id]}
+              onStateChange={onSubRuleChange}
+              onDelete={onSubRuleDelete} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Built-in rule row ─────────────────────────────────────────────────────────
+function BuiltInRow({ rule, onToggle, config, onConfigChange, subRules, subRuleStates, onSubRuleChange, onSubRuleDelete }: {
+  rule: BuiltInRule; onToggle: (id: string, v: boolean) => void;
+  config?: ManagedRuleConfig; onConfigChange: (id: string, patch: Partial<ManagedRuleConfig>) => void;
+  subRules?: SubRuleDef[]; subRuleStates?: Record<string, SubRuleState>;
+  onSubRuleChange?: (id: string, patch: Partial<SubRuleState>) => void;
+  onSubRuleDelete?: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const Icon = RULE_ICONS[rule.id] ?? Shield;
+  const hasSubRules = subRules && subRules.length > 0;
+  const effectiveConfig = config ?? DEFAULT_MANAGED_CONFIGS[rule.id];
   return (
     <div className={`border rounded-xl transition-all ${rule.enabled ? 'border-gray-700 bg-gray-900/40' : 'border-gray-800 bg-gray-900/20 opacity-60'}`}>
       <div className="flex items-center gap-3 px-4 py-3">
         <Toggle on={rule.enabled} onChange={(v) => onToggle(rule.id, v)} />
+        <Icon className="w-5 h-5 text-gray-500 shrink-0 hidden sm:block" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-white">{rule.name}</span>
             <SevBadge s={rule.severity} />
+            {hasSubRules && (
+              <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded">{subRules!.length} rules</span>
+            )}
+            {effectiveConfig?.action && effectiveConfig.action !== 'BLOCK' && (
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                effectiveConfig.action === 'ALLOW' ? 'text-green-400 bg-green-500/10' :
+                effectiveConfig.action === 'CHALLENGE' ? 'text-purple-400 bg-purple-500/10' :
+                'text-blue-400 bg-blue-500/10'
+              }`}>{effectiveConfig.action}</span>
+            )}
             <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">{rule.id}</span>
             <span className="text-xs bg-gray-800 text-gray-500 px-2 py-0.5 rounded">{rule.category}</span>
           </div>
@@ -114,23 +624,62 @@ function BuiltInRow({ rule, onToggle }: { rule: BuiltInRule; onToggle: (id: stri
         </div>
       </div>
       {open && (
-        <div className="px-4 pb-4 pt-1 border-t border-gray-800 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Rule ID</p>
-            <p className="text-white font-mono">{rule.id}</p>
+        <div className="px-4 pb-4 pt-1 border-t border-gray-800 space-y-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-gray-800/50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Rule ID</p>
+              <p className="text-white font-mono">{rule.id}</p>
+            </div>
+            <div className="bg-gray-800/50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Category</p>
+              <p className="text-white">{rule.category}</p>
+            </div>
+            <div className="bg-gray-800/50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Total Hits</p>
+              <p className="text-cyan-400 font-semibold">{rule.hitCount.toLocaleString()}</p>
+            </div>
+            <div className="sm:col-span-3 bg-gray-800/50 rounded-lg p-3">
+              <p className="text-xs text-gray-500 mb-1">Description</p>
+              <p className="text-gray-300">{rule.description}</p>
+            </div>
           </div>
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Category</p>
-            <p className="text-white">{rule.category}</p>
-          </div>
-          <div className="bg-gray-800/50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Total Hits</p>
-            <p className="text-cyan-400 font-semibold">{rule.hitCount.toLocaleString()}</p>
-          </div>
-          <div className="sm:col-span-3 bg-gray-800/50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Description</p>
-            <p className="text-gray-300">{rule.description}</p>
-          </div>
+          {/* Sub-Rules List (AWS WAF style) */}
+          {hasSubRules && onSubRuleChange && onSubRuleDelete && (
+            <SubRuleList groupId={rule.id} subRules={subRules!}
+              subRuleStates={subRuleStates ?? {}}
+              onSubRuleChange={onSubRuleChange}
+              onSubRuleDelete={onSubRuleDelete} />
+          )}
+          {/* Managed Rule Configuration Panel */}
+          {effectiveConfig && (
+            <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Settings className="w-3.5 h-3.5" /> Rule Group Configuration
+                </h4>
+                <button onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await fetch(`/api/rules/managed-config/${rule.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(effectiveConfig),
+                    });
+                    toast.success(`${rule.id} config saved`);
+                  } catch {
+                    toast.error('Failed to save config — API unreachable');
+                  } finally {
+                    setSaving(false);
+                  }
+                }} disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs hover:bg-cyan-500/30 transition-colors disabled:opacity-50">
+                  {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                  {saving ? 'Saving…' : 'Save Config'}
+                </button>
+              </div>
+              <ManagedConfigPanel ruleId={rule.id} config={effectiveConfig} onChange={onConfigChange} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -422,12 +971,9 @@ function RuleFormModal({ initial, onSave, onClose }: {
 
 // ── Static built-in rule definitions (always shown, state synced from API) ───
 const BUILTIN_RULES_STATIC: BuiltInRule[] = [
+  { id: 'CORE-001',   name: 'InfiniteXManagedCoreRuleSets',   description: 'AWS WAF Core Rule Set (CRS) — 22 individual rules for basic security protections', category: 'InfiniteXManagedRuleSets', severity: 'CRITICAL', enabled: true,  isBuiltIn: true, hitCount: 0 },
   { id: 'SQLI-001',   name: 'InfiniteXManagedSQLiRuleSets',   description: 'Managed SQL injection protection aligned with AWS WAF managed rule groups', category: 'InfiniteXManagedRuleSets', severity: 'CRITICAL', enabled: true,  isBuiltIn: true, hitCount: 0 },
-  { id: 'XSS-001',    name: 'InfiniteXManagedOWASPRuleSets',  description: 'Managed OWASP Top 10 protection for common web attacks',                category: 'InfiniteXManagedRuleSets', severity: 'CRITICAL', enabled: true,  isBuiltIn: true, hitCount: 0 },
-  { id: 'PT-001',     name: 'InfiniteXManagedPathTraversalRuleSets', description: 'Managed traversal protection for path traversal and directory traversal attempts', category: 'InfiniteXManagedRuleSets', severity: 'HIGH', enabled: true,  isBuiltIn: true, hitCount: 0 },
-  { id: 'CMDI-001',   name: 'InfiniteXManagedCommandInjectionRuleSets', description: 'Managed command injection protection for shell and code execution payloads', category: 'InfiniteXManagedRuleSets', severity: 'CRITICAL', enabled: true,  isBuiltIn: true, hitCount: 0 },
   { id: 'NOSQLI-001', name: 'InfiniteXManagedNoSQLRuleSets',   description: 'Managed NoSQL injection protection for database operators',              category: 'InfiniteXManagedRuleSets', severity: 'CRITICAL', enabled: true,  isBuiltIn: true, hitCount: 0 },
-  { id: 'SSRF-001',   name: 'InfiniteXManagedSSRFRuleSets',   description: 'Managed SSRF protection for internal service access attempts',          category: 'InfiniteXManagedRuleSets', severity: 'HIGH', enabled: true,  isBuiltIn: true, hitCount: 0 },
   { id: 'BOT-001',    name: 'InfiniteXManagedBotProtectionRuleSets', description: 'Managed bot and scanner protection with configurable actions',      category: 'InfiniteXManagedRuleSets', severity: 'MEDIUM', enabled: true,  isBuiltIn: true, hitCount: 0 },
   { id: 'RATE-001',   name: 'InfiniteXManagedRateLimitRuleSets', description: 'Managed rate limiting rules for burst and abuse prevention',         category: 'InfiniteXManagedRuleSets', severity: 'MEDIUM', enabled: true,  isBuiltIn: true, hitCount: 0 },
   { id: 'NULL-001',   name: 'InfiniteXManagedNullByteRuleSets', description: 'Managed null-byte injection protection for binary payloads',        category: 'InfiniteXManagedRuleSets', severity: 'HIGH', enabled: true,  isBuiltIn: true, hitCount: 0 },
@@ -447,6 +993,9 @@ export function RulesPage() {
   const [filterEnabled, setFilterEnabled] = useState<'ALL' | 'ON' | 'OFF'>('ALL');
   const [showForm, setShowForm] = useState(false);
   const [editRule, setEditRule] = useState<CustomRule | null>(null);
+  const [managedConfigs, setManagedConfigs] = useState<Record<string, ManagedRuleConfig>>({});
+  const [subRuleGroups, setSubRuleGroups] = useState<Record<string, SubRuleDef[]>>({});
+  const [subRuleStates, setSubRuleStates] = useState<Record<string, SubRuleState>>({});
 
   const audit = useAudit();
 
@@ -454,9 +1003,11 @@ export function RulesPage() {
     // Always show static built-in rules immediately — no blank state
     setBuiltIn(BUILTIN_RULES_STATIC);
     try {
-      const [b, c] = await Promise.all([
+      const [b, c, m, s] = await Promise.all([
         fetch('/api/rules/builtin').then((r) => r.json()),
         fetch('/api/rules/custom').then((r) => r.json()),
+        fetch('/api/rules/managed-config').then((r) => r.json()),
+        fetch('/api/rules/sub-rules').then((r) => r.json()),
       ]);
       // Merge live enabled/hitCount state from API onto static definitions
       const apiMap = new Map<string, { enabled: boolean; hitCount: number }>(
@@ -467,6 +1018,14 @@ export function RulesPage() {
         return live ? { ...r, enabled: live.enabled, hitCount: live.hitCount } : r;
       }));
       setCustom(c.rules ?? []);
+      setManagedConfigs(m.configs ?? {});
+      // Build sub-rule lookup: groupId -> SubRuleDef[]
+      const groups: Record<string, SubRuleDef[]> = {};
+      for (const g of (s.groups ?? [])) {
+        groups[g.groupId] = g.rules;
+      }
+      setSubRuleGroups(groups);
+      setSubRuleStates(s.states ?? {});
     } catch {
       // API unreachable — static rules already shown with default state
     } finally {
@@ -475,6 +1034,39 @@ export function RulesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  function handleConfigChange(id: string, patch: Partial<ManagedRuleConfig>) {
+    setManagedConfigs((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] ?? {}), ...patch },
+    }));
+  }
+
+  function handleSubRuleChange(ruleId: string, patch: Partial<SubRuleState>) {
+    // Optimistic update
+    setSubRuleStates((prev) => ({
+      ...prev,
+      [ruleId]: { ...(prev[ruleId] ?? { enabled: true }), ...patch },
+    }));
+    // Persist to API
+    fetch(`/api/rules/sub-rules/${ruleId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).catch(() => {});
+  }
+
+  function handleSubRuleDelete(ruleId: string) {
+    if (!confirm(`Remove rule "${ruleId}" from this rule group? You can restore it later.`)) return;
+    // Optimistic
+    setSubRuleStates((prev) => ({
+      ...prev,
+      [ruleId]: { ...(prev[ruleId] ?? { enabled: true }), deleted: true, enabled: false },
+    }));
+    fetch(`/api/rules/sub-rules/${ruleId}`, { method: 'DELETE' })
+      .then(() => toast.success(`Rule ${ruleId} removed`))
+      .catch(() => toast.error('Failed to delete rule'));
+  }
 
   // ── Built-in toggle ──────────────────────────────────────────────────────
   async function toggleBuiltIn(id: string, enabled: boolean) {
@@ -658,7 +1250,10 @@ export function RulesPage() {
             <div className="text-center py-12 text-gray-500">No rules match your filters</div>
           )}
           {filteredBuiltIn.map((r) => (
-            <BuiltInRow key={r.id} rule={r} onToggle={toggleBuiltIn} />
+            <BuiltInRow key={r.id} rule={r} onToggle={toggleBuiltIn}
+              config={managedConfigs[r.id]} onConfigChange={handleConfigChange}
+              subRules={subRuleGroups[r.id]} subRuleStates={subRuleStates}
+              onSubRuleChange={handleSubRuleChange} onSubRuleDelete={handleSubRuleDelete} />
           ))}
         </div>
       ) : (

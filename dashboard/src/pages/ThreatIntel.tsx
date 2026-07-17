@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDashboardStore } from '../store/dashboardStore';
+import { RuleHit, TopItem } from '../types';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -292,7 +293,7 @@ interface FeedEvent {
   uri: string;
 }
 
-function useLiveFeed(topRules: ReturnType<typeof useDashboardStore>['topRules'], topIPs: ReturnType<typeof useDashboardStore>['topIPs']) {
+function useLiveFeed(topRules: RuleHit[], topIPs: TopItem[]) {
   const [feed, setFeed] = useState<FeedEvent[]>([]);
 
   useEffect(() => {

@@ -47,7 +47,7 @@ Copy and paste this entire block into your SSH session.
 It installs Node.js 20, Nginx, PM2, clones your repo, builds everything, and starts the WAF.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/scripts/ec2-bootstrap.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Dip0375/infinitexwaf/main/scripts/ec2-bootstrap.sh)
 ```
 
 Or run it manually step by step — see **scripts/ec2-bootstrap.sh** in this repo.

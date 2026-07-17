@@ -1,7 +1,7 @@
 {
-  "name": "universal-waf",
+  "name": "infinitex-waf",
   "version": "2.0.0",
-  "description": "Universal Web Application Firewall with Advanced Protection - GeoIP, DDoS, Bot Protection, Brute Force Prevention",
+  "description": "InfiniteX WAF — Universal Web Application Firewall with Advanced Protection",
   "main": "dist/index-advanced.js",
   "scripts": {
     "build": "tsc",
@@ -11,8 +11,8 @@
     "proxy:start": "node dist/standalone/server.js",
     "proxy:start:advanced": "node dist/standalone/advanced-server.js",
     "package:lambda": "npm run build && cd dist && zip -r ../lambda-edge.zip lambda-edge/* && zip -r ../lambda-alb.zip lambda-alb/* && zip -r ../lambda-edge-advanced.zip lambda-edge/advanced.* && zip -r ../lambda-alb-advanced.zip lambda-alb/advanced.*",
-    "docker:build": "docker build -t universal-waf:latest .",
-    "docker:run": "docker run -p 3000:3000 -e BACKEND_URL=http://host.docker.internal:8080 universal-waf:latest",
+    "docker:build": "docker build -t infinitex-waf:latest .",
+    "docker:run": "docker run -p 3000:3000 -e BACKEND_URL=http://host.docker.internal:8080 infinitex-waf:latest",
     "deploy:aws": "./deploy.sh",
     "clean": "rm -rf dist lambda-*.zip"
   },
@@ -47,6 +47,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/universal-waf"
+    "url": "https://github.com/Dip0375/infinitexwaf"
   }
 }

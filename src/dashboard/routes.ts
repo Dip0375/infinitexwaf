@@ -10,6 +10,8 @@ import {
   getBuiltInRules, setBuiltInRuleEnabled,
   getCustomRules, getCustomRule, createCustomRule, updateCustomRule,
   deleteCustomRule, toggleCustomRule,
+  getManagedRuleConfigs, getManagedRuleConfig, updateManagedRuleConfig,
+  getRuleGroupsWithSubRules, getSubRuleStates, updateSubRuleState, deleteSubRule, restoreSubRule,
 } from './rules-manager';
 
 const router = express.Router();
@@ -82,6 +84,58 @@ router.patch('/rules/custom/:id', (req, res) => {
 router.delete('/rules/custom/:id', (req, res) => {
   const ok = deleteCustomRule(req.params.id);
   if (!ok) return res.status(404).json({ success: false, error: 'Rule not found' });
+  res.json({ success: true });
+});
+
+// ===== MANAGED RULE CONFIG ROUTES (AWS WAF-style rule group parameters) =====
+
+/** GET /api/rules/managed-config — get all managed rule configurations */
+router.get('/rules/managed-config', (_req, res) => {
+  res.json({ configs: getManagedRuleConfigs() });
+});
+
+/** GET /api/rules/managed-config/:ruleId — get single managed rule config */
+router.get('/rules/managed-config/:ruleId', (req, res) => {
+  const config = getManagedRuleConfig(req.params.ruleId);
+  if (!config) return res.status(404).json({ success: false, error: 'Rule not found' });
+  res.json({ config });
+});
+
+/** PATCH /api/rules/managed-config/:ruleId — update managed rule config */
+router.patch('/rules/managed-config/:ruleId', (req, res) => {
+  const updated = updateManagedRuleConfig(req.params.ruleId, req.body);
+  if (!updated) return res.status(404).json({ success: false, error: 'Rule not found' });
+  res.json({ success: true, config: updated });
+});
+
+// ===== SUB-RULE ROUTES (individual rules within managed rule groups) ==========
+
+/** GET /api/rules/sub-rules — get all rule groups with their sub-rules + state */
+router.get('/rules/sub-rules', (_req, res) => {
+  res.json({
+    groups: getRuleGroupsWithSubRules(),
+    states: getSubRuleStates(),
+  });
+});
+
+/** PATCH /api/rules/sub-rules/:ruleId — update sub-rule state */
+router.patch('/rules/sub-rules/:ruleId', (req, res) => {
+  const updated = updateSubRuleState(req.params.ruleId, req.body);
+  if (!updated) return res.status(404).json({ success: false, error: 'Sub-rule not found' });
+  res.json({ success: true, state: updated });
+});
+
+/** DELETE /api/rules/sub-rules/:ruleId — soft-delete a sub-rule */
+router.delete('/rules/sub-rules/:ruleId', (req, res) => {
+  const ok = deleteSubRule(req.params.ruleId);
+  if (!ok) return res.status(404).json({ success: false, error: 'Sub-rule not found' });
+  res.json({ success: true });
+});
+
+/** POST /api/rules/sub-rules/:ruleId/restore — restore a deleted sub-rule */
+router.post('/rules/sub-rules/:ruleId/restore', (req, res) => {
+  const ok = restoreSubRule(req.params.ruleId);
+  if (!ok) return res.status(404).json({ success: false, error: 'Sub-rule not found' });
   res.json({ success: true });
 });
 
